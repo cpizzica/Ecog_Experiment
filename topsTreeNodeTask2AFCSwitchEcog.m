@@ -29,16 +29,15 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
       
       % Trial properties, put in a struct for convenience
       settings = struct( ...
-         'blockMin',                   0,   ... % min hazard-block length (trials)
-         'blockMax',                   0,   ... % max hazard-block length (trials)
-         'blockHazard',                0.1, ... % p(block switch)
          'predictOrReport',            'Report', ... % duh
          'useDrawables',               true, ... % Use visual stimuli
          'usePlayables',               true, ... % Use auditory stimuli
          'checkFixation',              false, ... % Whether to use eye tracker to check
          'minimumRT',                  0.0, ...
          'fractionCongruent',          0.0, ... % fraction of targets congurent with source
-         'stimlist',                    10);    
+         'Subject',                    '', ... %Patient Number
+         'Hazard',                     '', ... Hazard condition
+         'stimlist',                    '');    
       
       % Task timing parameters, all in sec
       timing = struct( ...
@@ -74,13 +73,13 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
       %     trialIterationMethod property to determine the
       %              ordering of the trials (in trialIndices)
       independentVariables = struct( ...
-            'hazard',   struct('values', ones(10,1))); 
+            'TrialCount',   struct('values', zeros(3,1))); 
       
       % dataFieldNames is a cell array of string names used as trialData fields
       % state and stim are 1/2
-      trialDataFields = {'fixationOn', 'drawOn', 'playOn', 'drawOff', ...
-         'instructionOn', 'choice', 'choiceTime', 'RT', 'fixationOff', ...
-         'stim', 'state', 'totalCorrect', 'totalChoices'};
+      trialDataFields = {'fixationOn', 'playOn', ...
+         'choice', 'choiceTime', 'RT', 'fixationOff', ...
+         'stim', 'state', 'totalChoices','Subject'};
       
       % Drawables settings
       drawable = struct( ...
@@ -99,27 +98,19 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          ...
          ...
          'BottomArc',                     struct( ...
-         'fevalable',                  @dotsDrawableTargets, ...
+         'fevalable',                  @dotsDrawableText, ...
          'settings',                   struct( ...
-         'xCenter',                     0,                ...
-         'yCenter',                    -6,   ...
-         'width',                       3, ...
-         'height',                      3, ...
-         'isSmooth',                 false,...
-         'colors',                     [1 1 1],...
-         'nSides',                      30)), ...
+         'x',                           0,                ...
+         'y',                          -4,     ...
+         'string',                       'R')), ...
          ...
          ...
          'TopArc',                     struct( ...
-         'fevalable',                  @dotsDrawableTargets, ...
+         'fevalable',                  @dotsDrawableText, ...
          'settings',                   struct( ...
-         'xCenter',                     0,                ...
-         'yCenter',                     6,   ...
-         'width',                       3, ...
-         'height',                      3, ...
-         'isSmooth',                 false,...
-         'colors',                     [1 1 1],...
-         'nSides',                      30)), ...
+         'x',                           0,                ...
+         'y',                           4,     ...
+         'string',                       'L')), ...
          ...
          ...
          'ErrorMessage',               struct( ...
@@ -235,8 +226,14 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
       %% Start task method
       function startTask(self)
          
-         self.settings.stimlist = load('ecoglist.mat');
+         switch lower(self.settings.Subject{2,1})
+             case 'high'
+                 self.settings.stimlist = load('HighHazard.mat');
 
+             case 'low'
+                 self.settings.stimlist = load('LowHazard.mat');                 
+         end
+         
          
          % ---- Initialize the state machine
          %
@@ -282,35 +279,15 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          trial = self.getTrial();
          %stimlist = load('ecoglist.mat');
          %---- Set up trial struct
-         %
-         % Initialize just the first time we use this trial
-%          if ~isfinite(trial.totalCorrect)
-               
+         %               
             % We iterate through each "trial" several times, so at the
-            % beginning we need to reset these counters
-            trial.totalCorrect = 0;           
+            % beginning we need to reset these counters           
             trial.totalChoices = 0;
-            trial.state = self.settings.stimlist.ecoglist(trial.trialIndex,1);
-            
-%          else
-            
-            % Clean up fields that get saved per trial
-            for ii = 1:length(self.trialDataFields)-3
-               trial.(self.trialDataFields{ii}) = nan;
-            end
-%          end
+            trial.state = self.settings.stimlist.hazard(trial.trialIndex,1);            
+            trial.stim = self.settings.stimlist.hazard(trial.trialIndex,2);
+            trial.Subject = self.settings.Subject;
+
          
-         % Switch/keep state based on hazard
-%          if rand() <= trial.hazard
-%             trial.state = bitxor(trial.state, 3);
-%          end
-         
-         % Get stim location from state
-%          if rand() <= self.settings.fractionCongruent
-%             trial.stim = trial.state;
-%          else
-            trial.stim = self.settings.stimlist.ecoglist(trial.trialIndex,2);
-%          end
          
          % Re-save the trial
          self.setTrial(trial);
@@ -336,16 +313,9 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          % ---- Show information about the trial
          %
          % Task information
-         taskString = sprintf('%s (ID=%d, task %d/%d)', self.name, ...
-            self.taskID, self.taskIndex, length(self.caller.children));         
-         
-         % Trial information
-         trialString = sprintf('Trial %d(%d)/%d: Correct=%d/%d', ...
-            self.trialCount, self.incrementTrial.counter, numel(self.trialData), ...
-            trial.totalCorrect, trial.totalChoices);
+
          
          % Show the information
-         self.updateStatus(taskString, trialString);
       end
       
       %% Finish Trial
@@ -361,44 +331,14 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          % ---- Get the trial
          %
          trial = self.getTrial();
-         % ---- Possibly show the visual stimulus         
-         %
-         %if self.settings.useDrawables
-         %   self.helpers.stimulusEnsemble.draw({[trial.stim], []}, ...
-         %       self, 'drawOn');
-         % end
          
-         % ---- Possibly play the auditory stimulus         
+         % ---- Play the auditory stimulus         
          %
          if self.settings.usePlayables            
             self.helpers.(['stimulus' 64+trial.stim]).startPlaying( ...
                self, 'playOn');
          end
-      end
-      
-      %% Hide stimulus
-      %
-      function hideStimulus(self)
-         
-         % ---- Possibly hide the visual stimulus
-         %
-         if self.settings.useDrawables
-            self.helpers.stimulusEnsemble.draw({2, []}, ...
-               self, 'drawOff');
-         end
-      end
-         
-      %% Jit calls
-      %
-      function BasewithJitter = JitSelect(self,basetime,turn)
-              
-              y = 0:0.1:5;
-              x = exppdf(y,turn);
-              Jitter = x(randi(51));
-              BasewithJitter = basetime + Jitter;
-              
-          end
-              
+      end       
 
       %% Check for choice
       %
@@ -426,34 +366,17 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          % 
          % Get current task/trial and set/save RT, choice
          trial        = self.getTrial();
-         trial.RT     = trial.choiceTime - trial.instructionOn;
+         trial.RT     = trial.choiceTime - trial.TargetsOn;
          trial.choice = 1+double(strcmp(eventName, 'choseB'));
          
          % Mark as correct/error (with respect to largest reward side)
          trial.totalChoices = trial.totalChoices + 1;
-         trial.totalCorrect = trial.totalCorrect + double( ...
-            trial.choice == trial.stim);
         
          nextState = strcat(nextStateAfterChoice,eventName);
 
          
          % Re-save the trial
          self.setTrial(trial);
-      end
-      
-      function nextState = BlankChoice(self, nextStateAfterNoChoice)
-               
-         % ---- Good choice!
-         %
-         % Override completedTrial flag
-         self.completedTrial = true;
-         
-         % Jump to next state when done
-         nextState = nextStateAfterNoChoice;
-         
-         % ---- Save trial info
-         % 
-        
       end
    end
    
@@ -476,16 +399,11 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
 
 
 
-         %showst = {@draw, self.helpers.stimulusEnsemble,{{'isVisible', true, trial.stim}, {'isVisible', false, [3]}}, self, 'drawOn'};
 
          showst = {@showStimulus, self};
-         %hidest = {@hideStimulus, self};
-         %hidest = {@draw, self.helpers.stimulusEnsemble, {'isVisible', false, []}, self, 'drawOff'};
-         showi  = {@show, self.helpers.message, self.settings.predictOrReport, self, 'instructionOn'};
          
          % Read
          chkchc = {@checkForChoice, self, {'choseA' 'choseB'}, 'choiceTime', 'waitAfterChoice'};
-         %nochc = {@BlankChoice,self,'waitAfterChoice'};
          
          % ---- Conditional check for fixation
          %
@@ -502,10 +420,6 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          % ---- Timing variables, read directly from the timing property struct
          %
          t = self.timing;
-         WBSJitter = {@JitSelect,self,t.waitBeforeStim,1};
-         WASJitter = {@JitSelect,self,t.waitAfterStim,1};
-         WATJitter = {@JitSelect,self,0,4};
-
 
          % ---- The Stimulus state machine
          %
@@ -515,9 +429,9 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
             'checkFixation'      {}       chkeyef  t.waitFix            {}       'retry'        ; ...
             'retry'              blanks   {}       t.interTrialInterval {}       'checkFixation'; ...            
             'noCheckFixation'    {}       {}       t.waitNoFix          {}       'holdFixation' ; ...
-            'holdFixation'       {}       chkeyeb  [1 1 1.5]            {}       'showStim'     ; ...
+            'holdFixation'       {}       chkeyeb  [1 0.5 2]            {}       'showStim'     ; ...
             'showStim'           showst   chkeyeb  t.stimDuration       {}       'waitAfterStim'; ...
-            'waitAfterStim'      {}       chkeyeb  WASJitter            hidefp       'blank'        ; ...
+            'waitAfterStim'      {}       chkeyeb  [1 0.5 2]            hidefp       'blank'        ; ...
             'blank'              blanks   {}       0                    {}       ''             ; ...
             };
          
@@ -527,8 +441,8 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
             'name'               'entry'  'input'  'timeout'            'exit'   'next'         ; ...
             'getChoice'          showtg    chkchc     5                  blanks    'beforeChoice'   ; ...   
             'beforeChoice'        showerror        {}     1                  {}      'getChoice'    ; ...
-            'waitAfterChoicechoseA'   hidetgb    {}       [.5 .75 1]      blanks         ''          ; ...
-            'waitAfterChoicechoseB'   hidetga    {}       [.5 .75 1]      blanks         ''          ;
+            'waitAfterChoicechoseA'   hidetgb    {}       [0.5 0.5 1]      blanks         ''          ; ...
+            'waitAfterChoicechoseB'   hidetga    {}       [0.5 0.5 1]      blanks         ''          ;
             };
 
          % ---- Add state machines in appropriate order
@@ -536,8 +450,8 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          if strcmp(self.settings.predictOrReport, 'predict')
             
             % Prediction task: first response, then stimulus
-            self.addStateMachine(responseStates);
             self.addStateMachine(stimStates);
+            self.addStateMachine(responseStates);
          else
             
             % Report task: first stimulus, then response
@@ -555,17 +469,6 @@ classdef topsTreeNodeTask2AFCSwitchEcog < topsTreeNodeTask
          
          % ---- Get the task object, with optional property/value pairs
          task = topsTreeNodeTask2AFCSwitchEcog(varargin{:});
-      end
-      
-      %% ---- Utility for getting test configuration
-      %
-      function task = getTestConfiguration()
-         
-         task = topsTreeNodeTask2AFCSwitchEcog();
-         task.settings.blockMin = 2;
-         task.settings.blockMax = 2;
-         % task.independentVariables.hazard.values = 0.5;
-         task.message.message.Instructions.text = {'Testing', 'topsTreeNodeTask2AFCSwitchEcog'};
       end
    end
 end
