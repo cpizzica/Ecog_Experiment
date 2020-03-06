@@ -25,14 +25,17 @@ end
 
 % Add 'keyboard' readable that reads from the keyboard
 topNode.addReadable('dotsReadableHIDKeyboard');
-topNode.addHelpers('TTL', 'fevalable', @dotsWritableDOut1208FS)
+%topNode.addHelpers('TTL', 'fevalable', @dotsWritableDOut1208FS)
 
-%topNode.addHelpers('TTL', 'fevalable', @dotsWritableDOutLabJack);
+%dtopNode.addHelpers('TTL', 'fevalable', @dotsWritableDOutLabJack);
 
 PredictTask = topsTreeNodeTask2AFCSwitchEcog();
 
-         PredictTask.settings.predictOrReport = 'Predict';
-         
+         %PredictTask.settings.predictOrReport = 'Predict';
+         prompt = {'Please enter Subject number ' , 'Hazard Condition (high or low)' , 'Report Condition (predict or report)'};
+         PatientID = inputdlg(prompt);
+         PredictTask.settings.Subject = PatientID;
+         PredictTask.settings.predictOrReport = PatientID{3,1};
          
 % Add the task
 topNode.addChild(PredictTask);       
@@ -40,5 +43,3 @@ topNode.addChild(PredictTask);
 
 % Run it
 topNode.run();
-
-
