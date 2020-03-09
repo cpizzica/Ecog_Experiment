@@ -24,10 +24,11 @@ end
 
 
 % Add 'keyboard' readable that reads from the keyboard
-topNode.addReadable('dotsReadableHIDKeyboard');
+% topNode.addReadable('dotsReadableHIDKeyboard');
+topNode.addReadable('dotsReadableHIDButtons');
 %topNode.addHelpers('TTL', 'fevalable', @dotsWritableDOut1208FS)
 
-%dtopNode.addHelpers('TTL', 'fevalable', @dotsWritableDOutLabJack);
+topNode.addHelpers('TTL', 'fevalable', @dotsWritableDOutLabJack);
 
 PredictTask = topsTreeNodeTask2AFCSwitchEcog();
 
